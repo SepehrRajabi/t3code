@@ -1,4 +1,5 @@
 import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
+import type { EditorState } from "@tiptap/pm/state";
 import { Code } from "@tiptap/extension-code";
 import { TaskItem } from "@tiptap/extension-task-item";
 
@@ -48,6 +49,24 @@ const TIPTAP_TO_MARK: Record<string, RichTextMark> = {
  * Code nests inside emphasis here, so it only excludes itself like the rest.
  */
 export const ComposerCodeExtension = Code.extend({ excludes: "code" });
+
+const SURROUND_MARKS: Record<string, string> = { "`": "code", "*": "italic", _: "italic" };
+
+/**
+ * Typing a markdown marker over a selection styles it, matching what typing the
+ * markers around the text would produce. Returns null when the marker has no
+ * mark in this schema (plain mode), so the caller wraps with literal characters.
+ */
+export function surroundSelectionWithMark(
+  state: EditorState,
+  from: number,
+  to: number,
+  marker: string,
+) {
+  const markType = state.schema.marks[SURROUND_MARKS[marker] ?? ""];
+  if (!markType) return null;
+  return state.tr.addMark(from, to, markType.create());
+}
 
 /**
  * Task list items keep their exact source indent in an attribute so nesting
