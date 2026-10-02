@@ -377,6 +377,25 @@ describe("composer rich text document model", () => {
     expect(tr && serializeEditorDoc(tr.doc).value).toBe(expected);
   });
 
+  it.each([
+    ["paragraphs", "one\ntwo", 1, 8],
+    ["a hard break", null, 1, 8],
+  ])("leaves a selection across %s to literal wrapping", (_, value, from, to) => {
+    const doc = value
+      ? ProseMirrorNode.fromJSON(
+          schema,
+          buildDocJson(value, (name) => ({ label: name, description: null })),
+        )
+      : schema.node("doc", null, [
+          schema.node("paragraph", null, [
+            schema.text("one"),
+            schema.node("hardBreak"),
+            schema.text("two"),
+          ]),
+        ]);
+    expect(surroundSelectionWithMark(EditorState.create({ doc }), from, to, "`")).toBeNull();
+  });
+
   it("leaves surrounding to literal characters in plain mode", () => {
     const doc = ProseMirrorNode.fromJSON(
       plainSchema,

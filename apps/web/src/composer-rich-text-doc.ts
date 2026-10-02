@@ -55,7 +55,8 @@ const SURROUND_MARKS: Record<string, string> = { "`": "code", "*": "italic", _: 
 /**
  * Typing a markdown marker over a selection styles it, matching what typing the
  * markers around the text would produce. Returns null when the marker has no
- * mark in this schema (plain mode), so the caller wraps with literal characters.
+ * mark in this schema (plain mode) or the selection spans lines, where inline
+ * markdown cannot reach, so the caller wraps with literal characters.
  */
 export function surroundSelectionWithMark(
   state: EditorState,
@@ -64,7 +65,13 @@ export function surroundSelectionWithMark(
   marker: string,
 ) {
   const markType = state.schema.marks[SURROUND_MARKS[marker] ?? ""];
-  if (!markType) return null;
+  if (!markType || !state.doc.resolve(from).sameParent(state.doc.resolve(to))) return null;
+  let crossesLine = false;
+  state.doc.nodesBetween(from, to, (node) => {
+    if (node.type.name === "hardBreak") crossesLine = true;
+    return !crossesLine;
+  });
+  if (crossesLine) return null;
   return state.tr.addMark(from, to, markType.create());
 }
 
