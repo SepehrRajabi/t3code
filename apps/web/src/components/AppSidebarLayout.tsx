@@ -102,13 +102,19 @@ function SidebarControl() {
       ) {
         return;
       }
+      const richComposer =
+        event.target instanceof HTMLElement
+          ? event.target.closest('[data-composer-rich-text="true"]')
+          : null;
+      const selection = window.getSelection();
       if (
         isRichTextBoldShortcut(event) &&
-        event.target instanceof HTMLElement &&
-        event.target.closest('[data-composer-rich-text="true"]') &&
-        window.getSelection()?.isCollapsed === false
+        richComposer &&
+        selection?.isCollapsed === false &&
+        richComposer.contains(selection.anchorNode) &&
+        richComposer.contains(selection.focusNode)
       ) {
-        // The rich-text composer claims Mod+B to bold selected text. Without a
+        // The rich-text composer claims Mod+B to bold its selected text. Without a
         // selection the toggle wins, since the composer holds focus most of the time.
         return;
       }
