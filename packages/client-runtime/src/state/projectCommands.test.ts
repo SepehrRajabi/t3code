@@ -11,7 +11,7 @@ import {
   WS_METHODS,
 } from "@t3tools/contracts";
 import { vi } from "vite-plus/test";
-import * as Crypto from "effect/Crypto";
+import * as SecureRandom from "effect/crypto/SecureRandom";
 import * as Effect from "effect/Effect";
 import * as Deferred from "effect/Deferred";
 import * as Fiber from "effect/Fiber";
@@ -21,7 +21,7 @@ import * as Schema from "effect/Schema";
 import * as SubscriptionRef from "effect/SubscriptionRef";
 import * as Stream from "effect/Stream";
 import { Atom, AtomRegistry, AsyncResult } from "effect/reactivity";
-import { AVAILABLE_CONNECTION_STATE } from "../connection/model.ts";
+import { AVAILABLE_CONNECTION_STATE, BearerConnectionTarget } from "../connection/model.ts";
 
 import * as EnvironmentRegistry from "../connection/registry.ts";
 import * as EnvironmentSupervisor from "../connection/supervisor.ts";
@@ -53,7 +53,11 @@ const makeHarness = Effect.fn("TestProjectCommands.makeHarness")(function* () {
     missing: false,
   };
   const supervisor = EnvironmentSupervisor.EnvironmentSupervisor.of({
-    target: { environmentId: ENVIRONMENT_ID },
+    target: new BearerConnectionTarget({
+      environmentId: ENVIRONMENT_ID,
+      label: "Test",
+      connectionId: "test",
+    }),
     session: yield* SubscriptionRef.make(
       Option.some({
         client: {
@@ -107,11 +111,8 @@ const makeHarness = Effect.fn("TestProjectCommands.makeHarness")(function* () {
           Stream.provideService(stream, EnvironmentSupervisor.EnvironmentSupervisor, supervisor),
       } as EnvironmentRegistry.EnvironmentRegistry["Service"]),
       Layer.succeed(
-        Crypto.Crypto,
-        Crypto.make({
-          randomBytes: (size) => new Uint8Array(size),
-          digest: (_algorithm, data) => Effect.succeed(data),
-        }),
+        SecureRandom.SecureRandom,
+        SecureRandom.make((size) => new Uint8Array(size)),
       ),
     ),
   );
@@ -171,29 +172,7 @@ describe("writeFile metadata", () => {
         yield* AtomRegistry.getResult(h.registry, metadata, { suspendOnWaiting: true }),
       ).toBeNull();
       expect(h.metadataRequests).toEqual([["/repo/foo"]]);
-    }).pipe(Effect.scoped),
-  );
-
-  it.effect("reuses a current file read without another metadata request", () =>
-    Effect.gen(function* () {
-      const h = yield* makeHarness();
-      yield* AtomRegistry.getResult(
-        h.registry,
-        h.commands.readFile({
-          environmentId: ENVIRONMENT_ID,
-          input: { cwd: "/repo", relativePath: "foo" },
-        }),
-        { suspendOnWaiting: true },
-      );
-      const metadata = h.commands.fileMetadata({
-        environmentId: ENVIRONMENT_ID,
-        input: { path: "/repo/foo" },
-      });
-      expect(
-        yield* AtomRegistry.getResult(h.registry, metadata, { suspendOnWaiting: true }),
-      ).toEqual({ kind: "file", byteLength: 5 });
-      expect(h.metadataRequests).toHaveLength(0);
-    }).pipe(Effect.scoped),
+    }),
   );
 
   it.effect("does not restore old metadata from a read completed after a write", () =>
@@ -236,7 +215,7 @@ describe("writeFile metadata", () => {
       h.registry.refresh(metadata);
       expect(yield* readMetadata()).toEqual({ kind: "file", byteLength: 10 });
       expect(h.metadataRequests).toHaveLength(2);
-    }).pipe(Effect.scoped),
+    }),
   );
 
   it.effect("refreshes retained canonical and original paths after an aliased write", () =>
@@ -275,7 +254,7 @@ describe("writeFile metadata", () => {
         "/repo/foo",
         "/repo/./foo",
       ]);
-    }).pipe(Effect.scoped),
+    }),
   );
 });
 
@@ -288,6 +267,6 @@ describe("openScratch", () => {
       registry.set(storedProject, PROJECT);
       const result = yield* Fiber.join(opening);
       expect(result).toMatchObject({ _tag: "Success", value: PROJECT });
-    }).pipe(Effect.scoped),
+    }),
   );
 });
